@@ -47,17 +47,25 @@ class TestPlantConsumedPower(unittest.TestCase):
         data = self.data({"First": {"ac_charger_charging_power": 2}})
         self.assertEqual(2, self.consumed(data))
 
-    def test_fallback_requires_a_valid_reading_from_each_configured_charger(self):
+    def test_fallback_skips_missing_or_invalid_charger_readings(self):
         data = self.data({"First": {"ac_charger_charging_power": 1}, "Second": {}})
         for reading in ({}, *({"ac_charger_charging_power": value} for value in
                               (None, True, "invalid", float("nan"), float("inf")))):
             with self.subTest(reading=reading):
                 data["ac_chargers"]["Second"] = reading
-                self.assertIsNone(self.consumed(data))
+                self.assertEqual(3, self.consumed(data))
         data["ac_chargers"]["Second"] = {"ac_charger_charging_power": 0}
         self.assertEqual(3, self.consumed(data))
         data["ac_chargers"]["Second"]["ac_charger_charging_power"] = 1
         self.assertEqual(2, self.consumed(data))
+
+    def test_unreadable_charger_does_not_blank_consumption(self):
+        # A configured charger that is offline (empty row) or whose reading is
+        # missing must not make household consumption unknown.
+        for chargers in ({"Garage": {}}, {"Garage": {"ac_charger_charging_power": None}},
+                         {"Garage": {}, "Driveway": {}}):
+            with self.subTest(chargers=chargers):
+                self.assertEqual(4, self.consumed(self.data(chargers)))
 
     def test_direct_consumption_wins_over_fallback(self):
         data = self.data({"Charger": {}})

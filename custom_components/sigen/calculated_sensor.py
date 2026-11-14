@@ -382,10 +382,13 @@ class SigenergyCalculations:
         for ac_charger_data in ac_chargers.values():
             raw_power = ac_charger_data.get("ac_charger_charging_power")
             if raw_power is None or isinstance(raw_power, bool):
-                return None
+                # A charger with no current reading (offline or a slow poll) must
+                # not blank household consumption; it contributes nothing until
+                # its reading returns.
+                continue
             ac_power = safe_float(raw_power)
             if ac_power is None or not isfinite(ac_power):
-                return None
+                continue
             total_ac_charger_power += ac_power
 
         plant_power = plant_data.get("plant_active_power")
