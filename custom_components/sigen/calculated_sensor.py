@@ -53,6 +53,18 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+
+def _is_all_ones_power_marker(value: float) -> bool:
+    """Detect the all-ones marker of a `/1000` power register.
+
+    A device that does not implement a power register answers with all-ones
+    words, which decode to `-1` (signed S32) or `4294967295` (unsigned U32)
+    before the `/1000` gain. Treated as "no reading" so callers fall back
+    instead of trusting the marker as a measurement.
+    """
+    return int(round(value * 1000)) in (-1, 0xFFFFFFFF)
+
+
 # Constants for daily sensor reset
 DAILY_RESET_HOUR = 0
 DAILY_RESET_MINUTE = 0
@@ -370,17 +382,26 @@ class SigenergyCalculations:
         plant_general_load_power = plant_data.get("plant_general_load_power")
         if plant_general_load_power is not None:
             try:
-                result = float(plant_general_load_power)
-                _LOGGER.debug(
-                    "[CS][Plant Consumed] Using direct plant_general_load_power=%s -> %s",
-                    plant_general_load_power, result,
-                )
-                return result
+                direct = float(plant_general_load_power)
             except (ValueError, TypeError):
                 # If conversion fails, fallback to calculated method
                 _LOGGER.warning(
                     "[CS][Plant Consumed] Direct register value 'plant_general_load_power' is invalid: %s. Probably due to old firmware. Falling back to calculation.",
                     plant_general_load_power
+                )
+            else:
+                if isfinite(direct) and not _is_all_ones_power_marker(direct):
+                    _LOGGER.debug(
+                        "[CS][Plant Consumed] Using direct plant_general_load_power=%s -> %s",
+                        plant_general_load_power, direct,
+                    )
+                    return direct
+                # A device that does not implement the register answers with
+                # all-ones, so fall back instead of reporting the marker.
+                _LOGGER.debug(
+                    "[CS][Plant Consumed] Ignoring all-ones plant_general_load_power=%s; "
+                    "using fallback calculation",
+                    plant_general_load_power,
                 )
 
         total_ac_charger_power = 0.0
