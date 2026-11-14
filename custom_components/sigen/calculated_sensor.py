@@ -359,6 +359,7 @@ class SigenergyCalculations:
         Formula: PV Power + Grid Import Power - Grid Export Power - Plant Battery Power
         """
         if coordinator_data is None or "plant" not in coordinator_data:
+            _LOGGER.debug("[CS][Plant Consumed] No plant snapshot in coordinator data")
             return None
 
         # Get the required values from coordinator data
@@ -369,7 +370,12 @@ class SigenergyCalculations:
         plant_general_load_power = plant_data.get("plant_general_load_power")
         if plant_general_load_power is not None:
             try:
-                return float(plant_general_load_power)
+                result = float(plant_general_load_power)
+                _LOGGER.debug(
+                    "[CS][Plant Consumed] Using direct plant_general_load_power=%s -> %s",
+                    plant_general_load_power, result,
+                )
+                return result
             except (ValueError, TypeError):
                 # If conversion fails, fallback to calculated method
                 _LOGGER.warning(
@@ -397,6 +403,14 @@ class SigenergyCalculations:
 
         # Validate inputs
         if plant_power is None or grid_power is None or third_party_pv_power is None:
+            _LOGGER.warning(
+                "[CS][Plant Consumed] Fallback inputs incomplete, returning unknown: "
+                "plant_general_load_power=%s plant_active_power=%s "
+                "plant_grid_sensor_active_power=%s plant_third_party_photovoltaic_power=%s "
+                "ac_chargers=%s",
+                plant_general_load_power, plant_power, grid_power,
+                third_party_pv_power, sorted(ac_chargers),
+            )
             return None
 
         # Validate input types
@@ -427,6 +441,13 @@ class SigenergyCalculations:
             )
             return None
 
+        _LOGGER.debug(
+            "[CS][Plant Consumed] Calculated %s from plant_active_power=%s "
+            "plant_grid_sensor_active_power=%s plant_third_party_photovoltaic_power=%s "
+            "ac_charger_power=%s",
+            consumed_power, plant_power, grid_power, third_party_pv_power,
+            total_ac_charger_power,
+        )
         return consumed_power
 
     @staticmethod

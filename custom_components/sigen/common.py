@@ -146,11 +146,23 @@ def get_entity_register_support(
                 alternative_states.append(None)
 
         if any(state is True for state in alternative_states):
+            _LOGGER.debug(
+                "Register support for '%s' resolved True (alternatives=%s, keys=%s)",
+                description.key, alternative_states, register_support_keys,
+            )
             return True, register_support_keys
         if alternative_states and all(
             state is False for state in alternative_states
         ):
+            _LOGGER.debug(
+                "Register support for '%s' resolved False (alternatives=%s, keys=%s)",
+                description.key, alternative_states, register_support_keys,
+            )
             return False, register_support_keys
+        _LOGGER.debug(
+            "Register support for '%s' unresolved (alternatives=%s, keys=%s)",
+            description.key, alternative_states, register_support_keys,
+        )
         return None, register_support_keys
 
     register_support_keys = resolve_register_support_keys(
@@ -254,6 +266,11 @@ def generate_sigen_entity(
                 # Wait for evidence before adding optional entities. Synthetic
                 # diagnostic/calculation keys still use their existing path.
                 deferred_descriptions.append(description)
+                _LOGGER.debug(
+                    "Deferring entity '%s' (%s) until register support resolves: %s",
+                    description.name, description.key,
+                    ", ".join(register_support_keys),
+                )
                 continue
         if register_support is False:
             if getattr(coordinator.hub, "incremental_discovery", False):
